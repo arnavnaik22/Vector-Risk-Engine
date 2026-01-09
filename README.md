@@ -20,7 +20,7 @@ This repository serves as the official implementation artifact for the research 
 
 The paper details the mathematical foundations of Entropic Stability, the ablation studies on Velocity Drift, and the hybrid predictive–generative architecture used in this codebase.
 
-**[Download the Full Research Paper (DOCX)](paper.docx)**
+**[Download the Full Research Paper (DOCX)](paper.pdf)**
 
 ---
 
