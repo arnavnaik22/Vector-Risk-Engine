@@ -4,32 +4,42 @@ import numpy as np
 import xgboost as xgb
 import shap
 import matplotlib.pyplot as plt
-import os
-from groq import Groq
+from pathlib import Path
+import importlib
+
+Groq = None
+try:
+    Groq = importlib.import_module("groq").Groq
+except Exception:
+    Groq = None
 
 # CONFIGURATION & AUTHENTICATION
-st.set_page_config(page_title="Behavioural Intelligence Engine", layout="wide", page_icon=r"C:\Users\arnav\OneDrive\Documents\3dc3f966-9b4e-4f1a-9ef9-02ee0a3f62b3.jpeg")
+st.set_page_config(
+    page_title="Behavioural Intelligence Engine",
+    layout="wide",
+    page_icon="📈"
+)
 
 # API Key Validation
-if "GROQ_API_KEY" in st.secrets:
-    API_KEY = st.secrets["GROQ_API_KEY"]
-else:
-    st.error("Missing API Key. Please configure .streamlit/secrets.toml")
-    st.stop()
+API_KEY = st.secrets.get("GROQ_API_KEY") if "GROQ_API_KEY" in st.secrets else None
+client = Groq(api_key=API_KEY) if API_KEY else None
 
-client = Groq(api_key=API_KEY)
+if client is None:
+    st.warning("Groq API key not configured. Strategy generation will use a local fallback.")
 
 # Path Configurations
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_PATH = os.path.join(BASE_DIR, '..', 'data', 'processed', 'labeled_customers.csv')
-MODEL_CLASS_PATH = os.path.join(BASE_DIR, '..', 'models', 'xgb_classifier.json')
-MODEL_REG_PATH = os.path.join(BASE_DIR, '..', 'models', 'xgb_regressor.json')
+BASE_DIR = Path(__file__).resolve().parent
+ROOT = BASE_DIR.parent
+
+DATA_PATH = ROOT / "data" / "processed" / "labeled_customers.csv"
+MODEL_CLASS_PATH = ROOT / "models" / "xgb_classifier.json"
+MODEL_REG_PATH = ROOT / "models" / "xgb_regressor.json"
 
 # RESOURCE MANAGEMENT (CACHED)
 @st.cache_data
 def load_data():
     """Loads and caches the customer dataset."""
-    if not os.path.exists(DATA_PATH):
+    if not DATA_PATH.exists():
         st.error(f"Data file not found at: {DATA_PATH}")
         st.stop()
     return pd.read_csv(DATA_PATH)
@@ -37,7 +47,7 @@ def load_data():
 @st.cache_resource
 def load_models():
     """Loads trained XGBoost models from disk."""
-    if not os.path.exists(MODEL_CLASS_PATH) or not os.path.exists(MODEL_REG_PATH):
+    if not MODEL_CLASS_PATH.exists() or not MODEL_REG_PATH.exists():
         st.error("Model files missing. Please run the training script first.")
         st.stop()
         
@@ -102,6 +112,14 @@ def calculate_roi_strategy(segment_prob, potential_spend, segment_name):
 
 def generate_strategic_narrative(context_data):
     """Uses LLM to generate a qualitative strategic report."""
+    if client is None:
+        return (
+            "Local fallback: the customer is in the "
+            f"{context_data['segment']} segment with {context_data['insight']} "
+            f"and {context_data['roi_action']}. "
+            "Configure GROQ_API_KEY in Streamlit Cloud secrets to enable LLM narratives."
+        )
+
     prompt = f"""
     Role: Senior Retention Strategist.
     

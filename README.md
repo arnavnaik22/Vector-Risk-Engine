@@ -6,120 +6,108 @@
 ![Streamlit](https://img.shields.io/badge/Frontend-Streamlit-red)
 ![Status](https://img.shields.io/badge/Status-Research%20Artifact-orange)
 
-> **A production-oriented decision support system bridging the gap between quantitative risk prediction and qualitative strategic reasoning.**
->
-> *Vector is designed for human-in-the-loop decision support, not autonomous intervention.*
+Vector is a hybrid behavioral intelligence engine for customer risk and value forecasting. It combines engineered behavioral signals, XGBoost-based inference, SHAP explanations, and a Groq-hosted Llama 3 assistant to generate human-readable retention actions.
 
-**Vector** moves beyond static churn probability. By synthesizing **differential behavioral vectors** (Velocity Drift) with **economic constraints** and **Generative AI**, it identifies *why* a customer is changing trajectory and *automatically* drafts the optimal retention strategy.
+The repository is intended for human-in-the-loop decision support, not autonomous intervention.
 
----
+## What Vector Does
 
-### Research Context
-This repository serves as the official implementation artifact for the research report:
-**"Behavioral Intelligence Engine: A Hybrid Predictive–Generative Framework for CLV"**
+Vector goes beyond static churn scores by tracking movement in customer behavior over time. It uses velocity-style features to identify customers who are cooling down, stabilizing, or gaining momentum, then pairs those signals with a lightweight business rule layer and a generative strategy layer.
 
-The paper details the mathematical foundations of Entropic Stability, the ablation studies on Velocity Drift, and the hybrid predictive–generative architecture used in this codebase.
+## Repository Contents
 
-**[Download the Full Research Paper](paper.pdf)**
+- `app/`: Streamlit dashboard for interactive customer analysis.
+- `data/raw/`: UCI Online Retail source data used by the pipeline.
+- `data/processed/`: Prebuilt customer feature table used by the app.
+- `models/`: Trained XGBoost classifier and regressor artifacts.
+- `experiments/`: Offline research pipeline, ablation study, and exported charts.
+- `notebooks/`: Segmentation, churn prediction, and SHAP explanation notebooks.
+- `paper.pdf`: Research paper describing the framework and evaluation.
+- `assets/`: UI assets used by the dashboard.
+- `runtime.txt`: Python version for Streamlit Cloud.
 
----
+## Core Pipeline
 
-## The Core Problem
-Standard RFM (Recency, Frequency, Monetary) models are **static snapshots**. They cannot distinguish between a customer who is *accumulating* value and one who is *decelerating*.
-* **The Gap:** High-value customers often show "negative momentum" (drift) long before they churn.
-* **The Solution:** Vector treats customer behavior as a physics problem—measuring the **velocity** and **acceleration** of spend—gated by a rigorous economic ROI filter.
+### 1. Feature Engineering
 
-## System Architecture
+- Uses a strict 90-day split to reduce leakage.
+- Builds RFM-style features plus velocity signals such as `Velocity_Recent` and `Velocity_Drift`.
+- Derives `Avg_Monthly_Spend` and `AOV` so value and tenure are modeled separately.
 
-Vector operates as a decoupled, three-stage pipeline designed for interpretability and latency-constrained environments.
+### 2. Inference
 
-### 1. The Refinery (Feature Engineering)
-* **Temporal Causality:** Enforces a strict 90-day lookahead window to prevent data leakage.
-* **Vector Drift ($\Delta v$):** Computes the differential between *Recent Velocity* (90-day) and *Lifetime Velocity*. This acts as a leading indicator for "Silent Attrition."
-* **Decoupled Value:** Replaces lifetime aggregates with `Avg_Monthly_Spend` to separate tenure from intensity.
+- An XGBoost classifier assigns a behavioral segment.
+- An XGBoost regressor predicts future spend.
+- SHAP explainers expose the strongest drivers behind each prediction.
 
-### 2. The Engine (Inference Core)
-* **Behavioral Regimes:** K-Means clustering on log-normalized manifolds to identify stable behavioral archetypes.
-* **Risk Classification:** An XGBoost Classifier approximates cluster boundaries (96% Accuracy) for real-time segmentation.
-* **Value Forecasting:** An XGBoost Regressor optimized for **Ranking Quality** (Spearman Rho) rather than raw error, prioritizing the *relative* order of high-value customers.
+### 3. Strategy Generation
 
-### 3. The Strategist (Generative Decision Layer)
-* **Economic Gating:** A deterministic logic layer that suppresses interventions where `Cost > Predicted_LTV * Margin`.
-* **Generative Reasoning:** A **Llama-3 (Groq)** agent acts as a "Senior Analyst." It ingests the numeric risk signals + SHAP drivers to generate structured, tactical recommendations (e.g., "Defend," "Nurture," "Upsell").
+- A deterministic ROI gate filters out actions that do not clear the cost threshold.
+- A Groq Llama 3 model turns the numeric signals into concise tactical guidance.
 
----
+## Installation
 
-## Performance Benchmarks
+The project targets Python 3.11 for Streamlit Cloud.
 
-Retail data is notoriously heavy-tailed ("Whales" distort metrics). Vector is evaluated on **Operational Utility** (Ranking) rather than just statistical fit.
+Install the runtime packages with:
 
-| Metric | Score | Industrial Context |
-| :--- | :--- | :--- |
-| **Ranking Quality** | **0.51–0.56 (Spearman)** | Strong signal for prioritizing high-value lists. |
-| **Risk Precision** | **98% (At-Risk)** | Near-zero waste on false-positive retention offers. |
-| **Error Reduction** | **29.4%** | Improvement over baseline mean-value predictors. |
-| **Core RMSE** | **$785** | Accuracy on the "Core Business" (99% of users). |
-
-*> **Note:** Raw RMSE ($7,540) is reported in the paper for transparency but excluded from optimization, as it is driven by top 1% outliers.*
-
----
-
-## Key Capabilities
-
-### Momentum Detection
-Static models miss gradual disengagement. Vector monitors the first derivative of purchase frequency:
-* `Drift < -0.5`: **"Cooling Down"** (Immediate intervention candidate).
-* `Drift > +0.5`: **"Gaining Momentum"** (Prime upsell candidate).
-
-### ROI-Gated Logic
-The system is economically aware. It will **suppress** high-risk alerts if the math doesn't work:
-```python
-if (Predicted_LTV * Margin * Capture_Rate) > Intervention_Cost:
-    return "Actionable"
-else:
-    return "Suppress (Negative ROI)"
+```bash
+pip install streamlit pandas numpy xgboost shap matplotlib groq scikit-learn seaborn openpyxl
 ```
 
+## Required Artifacts
 
-### First-Class Explainability
-SHAP (SHapley Additive exPlanations) values are not an afterthought. They are computed per-instance to resolve conflicting signals (e.g., "Why is this VIP flagged as At-Risk?") and fed directly into the LLM context.
+The dashboard loads these committed artifacts directly:
 
-### Installation & Usage
+- `data/raw/Online_Retail.xlsx`
+- `data/processed/labeled_customers.csv`
+- `models/xgb_classifier.json`
+- `models/xgb_regressor.json`
 
-Prerequisites: Python 3.9+
+If you retrain the pipeline, regenerate the processed CSV and model files before pushing.
 
-Clone the Repository
-git clone [https://github.com/YOUR_USERNAME/vector-risk-engine.git](https://github.com/YOUR_USERNAME/vector-risk-engine.git)
-cd vector-risk-engine
+## Configure Secrets
 
-Install Dependencies
-pip install -r requirements.txt --upgrade
+Create `.streamlit/secrets.toml` with your Groq key for the optional narrative generator:
 
-Configure Environment Create a .streamlit/secrets.toml file for the LLM inference layer:
+```toml
 GROQ_API_KEY = "your_key_here"
+```
 
-Launch the Dashboard
+## Run the Dashboard
+
+```bash
 streamlit run app/main.py
+```
 
-### Limitations & Scope
+## Streamlit Cloud
 
-Observational Nature: The model estimates behavioral risk, not the causal impact of interventions (A/B testing required for validation).
+Use `app/main.py` as the entrypoint and add `GROQ_API_KEY` in the Streamlit Cloud secrets UI. If the key is missing, the dashboard still loads and uses a local fallback for strategy text.
 
-Domain Calibration: Drift thresholds are calibrated on the UCI Online Retail dataset. New domains require re-tuning of the velocity parameters.
+## Run The Research Pipeline
 
-Inference Cost: Real-time SHAP calculation adds latency; for high-throughput production, pre-computation is recommended
+The offline experiment script reproduces the feature engineering and model comparison workflow:
 
+```bash
+python experiments/04_research.py
+```
 
-### Repository Structure
+It writes summary tables and charts into `experiments/`.
 
-notebooks/: Segmentation, Churn Prediction , SHAP Analysis.
+## Example Outputs
 
-experiments/: Research results
+- `experiments/final_research_results.csv`
+- `experiments/final_chart_clean.png`
+- `experiments/ablation_summary.csv`
+- `notebooks/shap_sales_summary.png`
+- `notebooks/shap_risk_summary.png`
 
-app/: Production-grade Streamlit dashboard.
+## Limitations
 
-models/: Serialized XGBoost artifacts (JSON).
+- The model estimates behavioral risk, not causal treatment effect.
+- Drift thresholds are tuned for the UCI Online Retail data distribution and may need recalibration for other domains.
+- Real-time SHAP analysis adds latency, so precomputation may be preferable for higher-throughput use cases.
 
-data/: ETL scripts and schema definitions.
+## Citation
 
-paper.docx: Full research documentation.
+If you use Vector as a research artifact, reference the paper included in this repository and describe any changes you made to the feature engineering or training setup.

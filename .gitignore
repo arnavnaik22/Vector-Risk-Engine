@@ -1,8 +1,4 @@
-data/raw/*
-data/processed/*
-!data/processed/.gitkeep  # Optional: keeps the folder structure
 
-models/*.json
 
 .streamlit/secrets.toml
 .env
