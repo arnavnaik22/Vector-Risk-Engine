@@ -189,6 +189,8 @@ OPPORTUNITY_THRESHOLDS = {
 def calculate_roi_strategy(segment_prob, potential_spend, segment_name, value_pct, engagement_score, recency, frequency, drift, return_count):
     """Calculates ROI and determines the optimal engagement strategy."""
     score = calculate_opportunity_score(potential_spend, value_pct, segment_prob, engagement_score, return_count)
+    strategy = "SKIP"
+    description = f"Opportunity {score:.1f} | Low opportunity score."
 
     if score >= OPPORTUNITY_THRESHOLDS['upsell']:
         strategy = "DEFEND" if segment_name == "At-Risk" and recency >= 180 else "UPSELL"
@@ -196,8 +198,6 @@ def calculate_roi_strategy(segment_prob, potential_spend, segment_name, value_pc
         strategy = "NURTURE"
     elif score >= OPPORTUNITY_THRESHOLDS['monitor']:
         strategy = "MONITOR"
-    else:
-        strategy = "SKIP"
 
     if segment_name == "At-Risk" and recency >= 180 and score >= OPPORTUNITY_THRESHOLDS['monitor']:
         strategy = "DEFEND"
@@ -215,10 +215,14 @@ def calculate_roi_strategy(segment_prob, potential_spend, segment_name, value_pc
     roi = captured_value - cost
     
     if roi > 0:
-        return f"{strategy}", f"Opportunity {score:.1f} | Est. ROI: +${roi:.0f} (Cost: ${cost})"
+        description = f"Opportunity {score:.1f} | Est. ROI: +${roi:.0f} (Cost: ${cost})"
     elif roi > -2:
-        return "MONITOR", f"Opportunity {score:.1f} | Est. ROI: ${roi:.0f} (Cost: ${cost})"
-        return "SKIP", f"Opportunity {score:.1f} | Value (${captured_value:.0f}) < Cost (${cost})"
+        strategy = "MONITOR"
+        description = f"Opportunity {score:.1f} | Est. ROI: ${roi:.0f} (Cost: ${cost})"
+    else:
+        description = f"Opportunity {score:.1f} | Value (${captured_value:.0f}) < Cost (${cost})"
+
+    return strategy, description
 
 
 def derive_insight(customer_data, cluster_name, drift, value_pct):
